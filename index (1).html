@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bilan calorique</title>
+<meta name="theme-color" content="#EFF1F0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bilan">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:#EFF1F0; --card:#FFFFFF; --ink:#181D22; --muted:#7A8189; --line:#DDE1E0;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; background:var(--paper); color:var(--ink);
+    font-family:'IBM Plex Mono', ui-monospace, monospace;
+    padding:20px 16px calc(140px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
+  }
+  .wrap { max-width:520px; margin:0 auto; }
+
+  .head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:18px; }
+  .month { font-family:'Bricolage Grotesque', system-ui, sans-serif; font-weight:800;
+    font-size:26px; letter-spacing:-0.02em; line-height:1; }
+  .year { font-size:12px; color:var(--muted); letter-spacing:0.14em; margin-top:6px; }
+  .nav { display:flex; gap:6px; }
+  .nav button { width:38px; height:38px; border:1px solid var(--line); background:var(--card);
+    border-radius:11px; color:var(--ink); font-size:15px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-family:inherit; }
+  .today-btn { width:auto !important; padding:0 13px; font-size:11px; white-space:nowrap; }
+
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; }
+  .counter { padding:18px 18px 16px; margin-bottom:14px; }
+  .counter-top { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .eyebrow { font-size:10px; letter-spacing:0.18em; color:var(--muted); text-transform:uppercase; }
+  .total { font-family:'Bricolage Grotesque', system-ui, sans-serif; font-weight:800;
+    font-size:52px; line-height:0.9; letter-spacing:-0.03em; font-variant-numeric:tabular-nums; }
+
+  .rule { position:relative; height:34px; margin-top:14px; }
+  .track { position:absolute; top:14px; left:0; right:0; height:6px; border-radius:3px;
+    background:linear-gradient(90deg,#CFE4EA 0%,#EDEAE5 50%,#F7DDD4 100%); }
+  .fill { position:absolute; top:14px; height:6px; border-radius:3px;
+    transition:all .35s cubic-bezier(.2,.7,.3,1); }
+  .center { position:absolute; top:8px; left:50%; width:1px; height:18px; background:#B9BFBE; }
+  .pin { position:absolute; top:6px; width:3px; height:22px; border-radius:2px;
+    transform:translateX(-50%); transition:left .35s cubic-bezier(.2,.7,.3,1), background .2s; }
+  .rule-legend { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); }
+
+  .grid-head { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin:0 0 6px; }
+  .grid-head span { text-align:center; font-size:10px; letter-spacing:0.1em; color:var(--muted); }
+  .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+
+  .day { position:relative; aspect-ratio:1/1; border:1px solid var(--line); background:var(--card);
+    border-radius:11px; cursor:pointer; padding:0; overflow:hidden; font-family:inherit;
+    display:flex; align-items:center; justify-content:center; transition:transform .12s ease; }
+  .day:active { transform:scale(0.94); }
+  .day.pad { visibility:hidden; }
+  .day .num { position:absolute; top:4px; left:6px; font-size:10px; color:var(--muted);
+    font-variant-numeric:tabular-nums; }
+  .day .mk { font-size:19px; font-weight:600; line-height:1; letter-spacing:-0.04em; }
+  .day.today { box-shadow:inset 0 0 0 2px var(--ink); }
+
+  .legend { display:flex; flex-wrap:wrap; gap:5px; margin-top:14px; }
+  .chip { display:flex; align-items:center; gap:6px; font-size:10px; color:var(--muted);
+    border:1px solid var(--line); background:var(--card); border-radius:999px; padding:4px 9px; }
+  .chip b { font-size:12px; letter-spacing:-0.04em; }
+
+  .trend { padding:16px 18px 14px; margin-top:14px; }
+  .bars { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-top:12px; }
+  .bar { display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .bar-plot { position:relative; width:100%; height:52px; }
+  .bar-axis { position:absolute; top:50%; left:0; right:0; height:1px; background:var(--line); }
+  .bar-val { position:absolute; left:22%; right:22%; border-radius:3px; min-height:2px; }
+  .bar-label { font-size:10px; color:var(--muted); }
+  .bar-num { font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .bar.now .bar-label { color:var(--ink); font-weight:600; }
+
+  .sheet { position:fixed; left:0; right:0; bottom:0; background:var(--card);
+    border-top:1px solid var(--line); border-radius:20px 20px 0 0;
+    padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+    box-shadow:0 -14px 40px rgba(20,28,34,.14); z-index:20;
+    animation:up .22s cubic-bezier(.2,.8,.3,1); }
+  @keyframes up { from { transform:translateY(100%); } to { transform:translateY(0); } }
+  .sheet-inner { max-width:520px; margin:0 auto; }
+  .sheet-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .sheet-date { font-family:'Bricolage Grotesque', system-ui, sans-serif; font-weight:600; font-size:15px; }
+  .close { border:none; background:none; color:var(--muted); font-size:13px; cursor:pointer;
+    padding:6px; font-family:inherit; }
+  .opts { display:flex; flex-direction:column; gap:6px; }
+  .opt { display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+    border:1px solid var(--line); border-radius:12px; padding:11px 13px; background:var(--card);
+    cursor:pointer; font-family:inherit; font-size:13px; color:var(--ink); }
+  .opt .glyph { min-width:44px; height:30px; border-radius:8px; display:flex; align-items:center;
+    justify-content:center; font-weight:600; font-size:16px; letter-spacing:-0.04em; }
+  .opt .val { margin-left:auto; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .clear { margin-top:8px; width:100%; border:1px dashed var(--line); background:none;
+    border-radius:12px; padding:10px; color:var(--muted); font-family:inherit; font-size:12px; cursor:pointer; }
+
+  .foot { display:flex; justify-content:space-between; align-items:center;
+    gap:8px; font-size:10px; color:var(--muted); margin-top:14px; }
+  .foot-actions { display:flex; gap:6px; }
+  .foot-actions button { border:1px solid var(--line); background:var(--card); color:var(--muted);
+    border-radius:999px; padding:5px 11px; font-family:inherit; font-size:10px; cursor:pointer; }
+  .notice { margin-top:10px; font-size:11px; color:#93331A; }
+
+  button:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce) { *, .sheet { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <div class="month" id="monthName"></div>
+      <div class="year" id="yearName"></div>
+    </div>
+    <div class="nav">
+      <button class="today-btn" id="btnToday">Noter aujourd'hui</button>
+      <button id="btnPrev" aria-label="Mois précédent">&larr;</button>
+      <button id="btnNext" aria-label="Mois suivant">&rarr;</button>
+    </div>
+  </div>
+
+  <div class="card counter">
+    <div class="counter-top">
+      <span class="eyebrow">Bilan du mois</span>
+      <span class="eyebrow" id="loggedCount"></span>
+    </div>
+    <div class="total" id="total"></div>
+    <div class="rule">
+      <div class="track"></div>
+      <div class="fill" id="fill"></div>
+      <div class="center"></div>
+      <div class="pin" id="pin"></div>
+    </div>
+    <div class="rule-legend"><span id="scaleLeft"></span><span id="scaleRight"></span></div>
+    <div class="notice" id="notice" hidden></div>
+  </div>
+
+  <div class="grid-head" id="gridHead"></div>
+  <div class="grid" id="grid"></div>
+  <div class="legend" id="legend"></div>
+
+  <div class="card trend">
+    <div class="counter-top">
+      <span class="eyebrow">Six derniers mois</span>
+      <span class="eyebrow" id="allTime"></span>
+    </div>
+    <div class="bars" id="bars"></div>
+  </div>
+
+  <div class="foot">
+    <span>Enregistré dans ce navigateur</span>
+    <span class="foot-actions">
+      <button id="btnExport">Exporter</button>
+      <button id="btnImport">Importer</button>
+    </span>
+  </div>
+  <input type="file" id="fileInput" accept="application/json" hidden>
+</div>
+
+<div id="sheetHost"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var STORAGE_KEY = 'bilan-calorique:marks';
+  var ORDER = ['--', '-', '*', '+', '++'];
+  var MARKS = {
+    '--': { value: -2, label: 'Très peu',          ink: '#12414F', fill: '#CFE4EA' },
+    '-':  { value: -1, label: 'Peu',               ink: '#2F6F80', fill: '#E4F1F4' },
+    '*':  { value:  0, label: 'Équilibré',         ink: '#6E675F', fill: '#EDE9E3' },
+    '+':  { value:  1, label: 'Beaucoup',          ink: '#A96A22', fill: '#FAEBD6' },
+    '++': { value:  2, label: 'Vraiment beaucoup', ink: '#93331A', fill: '#F7DDD4' }
+  };
+  var MOIS = ['Janvier','Février','Mars','Avril','Mai','Juin',
+              'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  var JOURS = ['L','M','M','J','V','S','D'];
+
+  var today = new Date();
+  var view = { year: today.getFullYear(), month: today.getMonth() };
+  var marks = {};
+  var selected = null;
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function key(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
+  function daysIn(y, m) { return new Date(y, m + 1, 0).getDate(); }
+  function signed(n) { return (n > 0 ? '+' : '') + n; }
+
+  function notice(msg) {
+    var el = document.getElementById('notice');
+    if (!msg) { el.hidden = true; return; }
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) marks = JSON.parse(raw) || {};
+    } catch (e) {
+      notice("Lecture impossible. Vérifie que le stockage du navigateur est autorisé.");
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(marks));
+      notice(null);
+    } catch (e) {
+      notice("Enregistrement impossible. Les marques resteront visibles mais ne seront pas conservées.");
+    }
+  }
+
+  function monthTotal(y, m) {
+    var t = 0, n = 0, dim = daysIn(y, m);
+    for (var d = 1; d <= dim; d++) {
+      var conf = MARKS[marks[key(y, m, d)]];
+      if (conf) { t += conf.value; n++; }
+    }
+    return { total: t, logged: n };
+  }
+
+  function inkFor(t) { return t > 0 ? MARKS['++'].ink : t < 0 ? MARKS['--'].ink : MARKS['*'].ink; }
+
+  function renderHeader() {
+    document.getElementById('monthName').textContent = MOIS[view.month];
+    document.getElementById('yearName').textContent = view.year;
+  }
+
+  function renderCounter() {
+    var s = monthTotal(view.year, view.month);
+    var dim = daysIn(view.year, view.month);
+    var scale = Math.max(10, Math.ceil(Math.abs(s.total) / 5) * 5);
+    var ratio = Math.max(-1, Math.min(1, s.total / scale));
+    var ink = inkFor(s.total);
+
+    document.getElementById('loggedCount').textContent = s.logged + '/' + dim + ' jours notés';
+    var totalEl = document.getElementById('total');
+    totalEl.textContent = signed(s.total);
+    totalEl.style.color = ink;
+
+    var fill = document.getElementById('fill');
+    fill.style.left = ratio < 0 ? (50 + ratio * 50) + '%' : '50%';
+    fill.style.width = (Math.abs(ratio) * 50) + '%';
+    fill.style.background = ink;
+    fill.style.opacity = s.total === 0 ? 0 : 1;
+
+    var pin = document.getElementById('pin');
+    pin.style.left = (50 + ratio * 50) + '%';
+    pin.style.background = ink;
+
+    document.getElementById('scaleLeft').textContent = '\u2212' + scale + ' déficit';
+    document.getElementById('scaleRight').textContent = 'surplus +' + scale;
+  }
+
+  function renderGrid() {
+    var head = document.getElementById('gridHead');
+    if (!head.childElementCount) {
+      JOURS.forEach(function (j) {
+        var s = document.createElement('span');
+        s.textContent = j;
+        head.appendChild(s);
+      });
+    }
+
+    var grid = document.getElementById('grid');
+    grid.textContent = '';
+    var first = new Date(view.year, view.month, 1);
+    var offset = (first.getDay() + 6) % 7;
+    var dim = daysIn(view.year, view.month);
+    var isNow = view.year === today.getFullYear() && view.month === today.getMonth();
+
+    for (var i = 0; i < offset; i++) {
+      var p = document.createElement('div');
+      p.className = 'day pad';
+      grid.appendChild(p);
+    }
+
+    for (var d = 1; d <= dim; d++) {
+      (function (day) {
+        var k = key(view.year, view.month, day);
+        var m = marks[k];
+        var conf = m ? MARKS[m] : null;
+        var btn = document.createElement('button');
+        btn.className = 'day' + (isNow && day === today.getDate() ? ' today' : '');
+        btn.setAttribute('aria-label', day + ' ' + MOIS[view.month] +
+          (conf ? ' — ' + conf.label : ' — non noté'));
+        if (conf) { btn.style.background = conf.fill; btn.style.borderColor = conf.fill; }
+
+        var num = document.createElement('span');
+        num.className = 'num';
+        num.textContent = day;
+        if (conf) { num.style.color = conf.ink; num.style.opacity = 0.7; }
+        btn.appendChild(num);
+
+        if (conf) {
+          var mk = document.createElement('span');
+          mk.className = 'mk';
+          mk.textContent = m;
+          mk.style.color = conf.ink;
+          btn.appendChild(mk);
+        }
+
+        btn.addEventListener('click', function () { openSheet(day); });
+        grid.appendChild(btn);
+      })(d);
+    }
+  }
+
+  function renderLegend() {
+    var el = document.getElementById('legend');
+    if (el.childElementCount) return;
+    ORDER.forEach(function (m) {
+      var chip = document.createElement('span');
+      chip.className = 'chip';
+      var b = document.createElement('b');
+      b.textContent = m;
+      b.style.color = MARKS[m].ink;
+      chip.appendChild(b);
+      chip.appendChild(document.createTextNode(MARKS[m].label));
+      el.appendChild(chip);
+    });
+  }
+
+  function renderTrend() {
+    var months = [];
+    for (var i = 5; i >= 0; i--) {
+      var d = new Date(view.year, view.month - i, 1);
+      var s = monthTotal(d.getFullYear(), d.getMonth());
+      months.push({ label: MOIS[d.getMonth()].slice(0, 3), total: s.total, logged: s.logged, now: i === 0 });
+    }
+    var max = 4;
+    months.forEach(function (h) { max = Math.max(max, Math.abs(h.total)); });
+
+    var allT = 0, allN = 0;
+    Object.keys(marks).forEach(function (k) {
+      var conf = MARKS[marks[k]];
+      if (conf) { allT += conf.value; allN++; }
+    });
+    document.getElementById('allTime').textContent = 'Cumul ' + signed(allT) + ' · ' + allN + ' jours';
+
+    var bars = document.getElementById('bars');
+    bars.textContent = '';
+    months.forEach(function (h) {
+      var pct = (Math.abs(h.total) / max) * 100;
+      var ink = h.total > 0 ? MARKS['++'].ink : h.total < 0 ? MARKS['--'].ink : '#B9BFBE';
+
+      var col = document.createElement('div');
+      col.className = 'bar' + (h.now ? ' now' : '');
+
+      var plot = document.createElement('div');
+      plot.className = 'bar-plot';
+      var axis = document.createElement('div');
+      axis.className = 'bar-axis';
+      var val = document.createElement('div');
+      val.className = 'bar-val';
+      val.style.background = ink;
+      val.style.height = (pct / 2) + '%';
+      val.style.top = h.total > 0 ? (50 - pct / 2) + '%' : '50%';
+      val.style.opacity = h.logged === 0 ? 0.18 : 1;
+      plot.appendChild(axis);
+      plot.appendChild(val);
+
+      var lab = document.createElement('span');
+      lab.className = 'bar-label';
+      lab.textContent = h.label;
+
+      var num = document.createElement('span');
+      num.className = 'bar-num';
+      num.style.color = ink;
+      num.textContent = h.logged === 0 ? '·' : signed(h.total);
+
+      col.appendChild(plot);
+      col.appendChild(lab);
+      col.appendChild(num);
+      bars.appendChild(col);
+    });
+  }
+
+  function closeSheet() {
+    selected = null;
+    document.getElementById('sheetHost').textContent = '';
+  }
+
+  function openSheet(day) {
+    if (selected === day) { closeSheet(); return; }
+    selected = day;
+    var host = document.getElementById('sheetHost');
+    host.textContent = '';
+
+    var k = key(view.year, view.month, day);
+    var sheet = document.createElement('div');
+    sheet.className = 'sheet';
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-label', 'Choisir un marqueur');
+
+    var inner = document.createElement('div');
+    inner.className = 'sheet-inner';
+
+    var head = document.createElement('div');
+    head.className = 'sheet-head';
+    var date = document.createElement('span');
+    date.className = 'sheet-date';
+    date.textContent = new Date(view.year, view.month, day)
+      .toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    var close = document.createElement('button');
+    close.className = 'close';
+    close.textContent = 'Fermer';
+    close.addEventListener('click', closeSheet);
+    head.appendChild(date);
+    head.appendChild(close);
+
+    var opts = document.createElement('div');
+    opts.className = 'opts';
+    ORDER.forEach(function (m) {
+      var b = document.createElement('button');
+      b.className = 'opt';
+      var g = document.createElement('span');
+      g.className = 'glyph';
+      g.textContent = m;
+      g.style.background = MARKS[m].fill;
+      g.style.color = MARKS[m].ink;
+      var v = document.createElement('span');
+      v.className = 'val';
+      v.textContent = signed(MARKS[m].value);
+      b.appendChild(g);
+      b.appendChild(document.createTextNode(MARKS[m].label));
+      b.appendChild(v);
+      b.addEventListener('click', function () { setMark(k, m); });
+      opts.appendChild(b);
+    });
+
+    var clear = document.createElement('button');
+    clear.className = 'clear';
+    clear.textContent = 'Effacer la marque';
+    clear.addEventListener('click', function () { setMark(k, null); });
+
+    inner.appendChild(head);
+    inner.appendChild(opts);
+    inner.appendChild(clear);
+    sheet.appendChild(inner);
+    host.appendChild(sheet);
+  }
+
+  function setMark(k, m) {
+    if (m === null) delete marks[k]; else marks[k] = m;
+    save();
+    closeSheet();
+    render();
+  }
+
+  function render() {
+    renderHeader();
+    renderCounter();
+    renderGrid();
+    renderLegend();
+    renderTrend();
+  }
+
+  function shift(delta) {
+    var d = new Date(view.year, view.month + delta, 1);
+    view.year = d.getFullYear();
+    view.month = d.getMonth();
+    closeSheet();
+    render();
+  }
+
+  document.getElementById('btnPrev').addEventListener('click', function () { shift(-1); });
+  document.getElementById('btnNext').addEventListener('click', function () { shift(1); });
+  document.getElementById('btnToday').addEventListener('click', function () {
+    today = new Date();
+    view.year = today.getFullYear();
+    view.month = today.getMonth();
+    render();
+    openSheet(today.getDate());
+  });
+
+  document.getElementById('btnExport').addEventListener('click', function () {
+    var blob = new Blob([JSON.stringify(marks, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'bilan-calorique-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('btnImport').addEventListener('click', function () {
+    document.getElementById('fileInput').click();
+  });
+
+  document.getElementById('fileInput').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        var merged = Object.assign({}, marks);
+        Object.keys(data).forEach(function (k) {
+          if (MARKS[data[k]] && /^\d{4}-\d{2}-\d{2}$/.test(k)) merged[k] = data[k];
+        });
+        marks = merged;
+        save();
+        render();
+      } catch (err) {
+        notice("Fichier illisible. Choisis un export généré par cette appli.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  load();
+  render();
+})();
+</script>
+</body>
+</html>
